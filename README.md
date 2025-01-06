@@ -2,9 +2,9 @@
 
 A Python script to clean up Notion exported files by removing hashes, fixing file names, and correcting markdown links.
 
-## Backup Warning
+## ⚠️ Backup Warning ⚠️
 
-⚠️ It's recommended to backup your files before running this script, as it works in most cases it still makes irreversible changes to file names and content.
+It's recommended to backup your files before running this script, as it works in most cases it still makes irreversible changes to file names and content.
 
 ## Description
 
