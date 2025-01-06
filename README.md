@@ -1,3 +1,5 @@
+![img](https://i.imgur.com/JooOQVK.png)
+
 # Notion Export Assistant
 
 Notion Export Assistant is a Python-based utility designed to streamline and clean up your Notion export data. When exporting your Notion workspace, filenames and directory names often include MD5 hashes appended to ensure uniqueness. This script removes those hashes from filenames, directory names, and within the contents of Markdown (.md) files, ensuring a cleaner and more readable file structure.
