@@ -14,7 +14,6 @@ Notion Export Assistant is a Python-based utility designed to streamline and cle
 - [Customization](#customization)
 - [Contributing](#contributing)
 - [License](#license)
-- [Acknowledgements](#acknowledgements)
 
 ## Features
 - Remove MD5 Hashes: Cleans MD5 hashes from filenames and directory names
