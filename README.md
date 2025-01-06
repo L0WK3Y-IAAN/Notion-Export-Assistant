@@ -2,6 +2,10 @@
 
 A Python script to clean up Notion exported files by removing hashes, fixing file names, and correcting markdown links.
 
+## Backup Warning
+
+⚠️ It's recommended to backup your files before running this script, as it works in most cases it still makes irreversible changes to file names and content.
+
 ## Description
 
 When exporting from Notion, files and directories often contain extra elements like:
@@ -84,9 +88,6 @@ After:
 [XXE (XML External Entity) Injection Cheat Sheet](Cheat%20Sheets/XXE%20(XML%20External%20Entity)%20Injection%20Cheat%20Sheet.md)
 ```
 
-## Backup Warning
-
-⚠️ It's recommended to backup your files before running this script, as it makes irreversible changes to file names and content.
 
 ## Known Limitations
 
