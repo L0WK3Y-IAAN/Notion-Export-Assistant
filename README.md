@@ -1,104 +1,182 @@
-# Notion Export File Cleaner
+# Notion Export Assistant
 
-A Python script to clean up Notion exported files by removing hashes, fixing file names, and correcting markdown links.
+Notion Export Assistant is a Python-based utility designed to streamline and clean up your Notion export data. When exporting your Notion workspace, filenames and directory names often include MD5 hashes appended to ensure uniqueness. This script removes those hashes from filenames, directory names, and within the contents of Markdown (.md) files, ensuring a cleaner and more readable file structure.
 
-## ⚠️ Backup Warning ⚠️
+⚠️ *Disclaimer* ⚠️: Use this script at your own risk. While it includes safety features like backup creation and dry run mode, always ensure you have comprehensive backups of your data before performing bulk modifications.
 
-It's recommended to backup your files before running this script, as it works in most cases it still makes irreversible changes to file names and content.
-
-## Description
-
-When exporting from Notion, files and directories often contain extra elements like:
-- 32-character hashes in filenames and directory names
-- Spaces before file extensions
-- Encoded spaces (%20) in paths
-- Duplicate markdown link text
-- Bold markers (**) in markdown links
-
-This script cleans up these artifacts to create a more manageable file structure.
+## Table of Contents
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Usage](#usage)
+- [Example](#example)
+- [Safety Features](#safety-features)
+- [Customization](#customization)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgements](#acknowledgements)
 
 ## Features
+- Remove MD5 Hashes: Cleans MD5 hashes from filenames and directory names
+- Clean Markdown Content: Removes MD5 hashes embedded within Markdown links without disrupting formatting or newlines
+- Preserve URL Encoding: Maintains URL-encoded separators (e.g., %20 for spaces) while removing hashes
+- Backup Creation: Optionally creates backups of files before modification
+- Dry Run Mode: Preview changes without applying them
+- Extensible: Easily add support for additional file types or patterns as needed
 
-- Removes 32-character hashes from filenames and directory names
-- Removes spaces before file extensions (.md, .html, .pdf, .csv)
-- Properly encodes spaces in markdown links
-- Removes duplicate text and hashes from markdown links
-- Supports dry run mode to preview changes
-- Handles nested directories
-- Processes multiple file types (.md, .html, .pdf, .csv)
-
-## Requirements
-
-- Python 3.6+
-- No additional dependencies required
+## Prerequisites
+- Python 3.6 or higher: Ensure you have Python installed on your system. You can download it from the official website.
 
 ## Installation
 
-1. Clone this repository or download the script:
+1. Clone the Repository:
 ```bash
-git clone <repository-url>
+git clone https://github.com/yourusername/Notion-Export-Assistant.git
 ```
 
-2. Make the script executable (Unix-based systems):
+2. Navigate to the Directory:
 ```bash
-chmod +x notion_cleaner.py
+cd Notion-Export-Assistant
 ```
+
+3. (Optional) Create a Virtual Environment:
+It's recommended to run the script within a virtual environment to manage dependencies.
+```bash
+python3 -m venv venv
+source venv/bin/activate  # On Windows, use venv\Scripts\activate
+```
+
+4. Install Dependencies:
+This script uses only standard Python libraries, so no additional installations are required. However, if you plan to extend its functionality, you might need to install additional packages.
 
 ## Usage
 
-Basic usage:
+The script is designed to be run from the command line. It accepts the path to your exported Notion directory and provides options for dry runs and backups.
+
+### Command-Line Arguments
+- `root_dir` (required): Path to the exported Notion directory
+- `--dry-run` (optional): Perform a dry run without making any changes. Useful for previewing what the script will do
+- `--backup` (optional): Create .bak backup files before modifying any files. Ensures you can restore original content if needed
+
+### Running the Script
 ```bash
-python notion_cleaner.py /path/to/notion/export
+python3 clean_notion_export.py /path/to/notion_export [--dry-run] [--backup]
 ```
 
-Preview changes without making them (dry run):
+### Example Commands
+
+1. Basic Usage:
+Remove MD5 hashes from filenames, directory names, and Markdown file contents.
 ```bash
-python notion_cleaner.py /path/to/notion/export --dry-run
+python3 clean_notion_export.py /Users/yourusername/NotionExports/MyWorkspace
 ```
 
-## Examples
-
-### File Renaming
-Before:
-```
-Misc 172d96806c47808a8c66ffa1012f3de7.md
-```
-After:
-```
-Misc.md
+2. Dry Run Mode:
+Preview the changes without applying them.
+```bash
+python3 clean_notion_export.py /Users/yourusername/NotionExports/MyWorkspace --dry-run
 ```
 
-### Directory Renaming
-Before:
-```
-Cheat Sheets 2d8d27defe864833a2f2481d9848be84/
-```
-After:
-```
-Cheat Sheets/
+3. With Backup:
+Create backup copies of files before modification.
+```bash
+python3 clean_notion_export.py /Users/yourusername/NotionExports/MyWorkspace --backup
 ```
 
-### Markdown Link Cleaning
-Before:
+4. Combined Dry Run and Backup:
+Preview changes and create backups (no changes will be made).
+```bash
+python3 clean_notion_export.py /Users/yourusername/NotionExports/MyWorkspace --dry-run --backup
+```
+
+## Example
+
+Before Running the Script:
 ```markdown
-[**XXE (XML External Entity) Injection Cheat Sheet**](Cheat%20Sheets/XXE%20(XML%20External%20Entity)%20Injection%20Cheat%20Sheet.md)%20Cheat%20Sheet%2014dd96806c478045921ee4ea505b192e.md)
+# Cheat Sheets
+
+[Misc](Cheat%20Sheets%202d8d27defe864833a2f2481d9848be84/Misc%20172d96806c47808a8c66ffa1012f3de7.md)
+
+# Bug Bounty / Web Pentesting
+
+[Web Penetration Testing Reconnaissance Cheat Sheet](Cheat%20Sheets%202d8d27defe864833a2f2481d9848be84/Web%20Penetration%20Testing%20Reconnaissance%20Cheat%20Sheet%20166d96806c47809580bed05be092ba6e.md)
 ```
-After:
+
+After Running the Script:
 ```markdown
-[XXE (XML External Entity) Injection Cheat Sheet](Cheat%20Sheets/XXE%20(XML%20External%20Entity)%20Injection%20Cheat%20Sheet.md)
+# Cheat Sheets
+
+[Misc](Cheat%20Sheets/Misc.md)
+
+# Bug Bounty / Web Pentesting
+
+[Web Penetration Testing Reconnaissance Cheat Sheet](Cheat%20Sheets/Web%20Penetration%20Testing%20Reconnaissance%20Cheat%20Sheet.md)
 ```
 
+## Safety Features
 
-## Known Limitations
+### Backup Option (--backup)
+Before modifying any files, the script can create a backup with a .bak extension. This ensures you can restore the original files if needed.
+```bash
+python3 clean_notion_export.py /path/to/notion_export --backup
+```
 
-- Only processes text-based files for content cleaning (.md and .html)
-- Only renames files with the supported extensions
-- Assumes Notion's standard export format and hash patterns
+### Dry Run Mode (--dry-run)
+Allows you to see what changes will be made without actually applying them. This is useful for verifying the script's behavior before making any modifications.
+```bash
+python3 clean_notion_export.py /path/to/notion_export --dry-run
+```
+
+**Important**: Always ensure you have backups of your data before running scripts that modify files, even if the script includes safety features.
+
+## Customization
+
+The script is designed to be easily customizable. Here are some ways you can adapt it to your needs:
+
+1. Adding Support for More File Types:
+By default, the script processes the following file extensions:
+```python
+TEXT_FILE_EXTENSIONS = {'.md', '.markdown', '.txt', '.html', '.htm', '.json', '.csv', '.xml'}
+```
+
+To add more file types, simply include their extensions in the set:
+```python
+TEXT_FILE_EXTENSIONS = {'.md', '.markdown', '.txt', '.html', '.htm', '.json', '.csv', '.xml', '.rst', '.cfg'}
+```
+
+2. Modifying Regex Patterns:
+If your exported files contain different patterns or additional types of hashes, you can adjust the regex patterns in the script accordingly.
+
+3. Logging Enhancements:
+For larger projects, consider modifying the script to log actions to a file for easier tracking and debugging.
 
 ## Contributing
 
-Feel free to submit issues, fork the repository, and create pull requests for any improvements.
+Contributions are welcome! If you encounter issues or have suggestions for improvements, feel free to open an issue or submit a pull request.
+
+1. Fork the Repository
+2. Create a Feature Branch
+```bash
+git checkout -b feature/YourFeatureName
+```
+
+3. Commit Your Changes
+```bash
+git commit -m "Add some feature"
+```
+
+4. Push to the Branch
+```bash
+git push origin feature/YourFeatureName
+```
+
+5. Open a Pull Request
 
 ## License
 
-MIT License - feel free to use and modify for your own purposes.
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+
+If you encounter any issues or need further assistance, feel free to reach out!
+
+Happy Organizing! 📝✨
