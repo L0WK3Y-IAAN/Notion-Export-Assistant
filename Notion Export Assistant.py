@@ -1,189 +1,166 @@
 '''
-Script is still WIP, the regex pattern still does not capture some instances of hashes inside of files, but should still work in most cases. Feel free to edit and adjust this script to your liking.
+⚠️ Disclaimer ⚠️: Use this script at your own risk. While it includes safety features like backup creation and dry run mode, always ensure you have comprehensive backups of your data before performing bulk modifications.
 '''
 
 import os
 import re
+import sys
 import argparse
+import shutil
+from pathlib import Path
 
-class NotionCleaner:
-    def __init__(self, directory, dry_run=False):
-        self.directory = directory
-        self.dry_run = dry_run
-        
-    def clean_filename(self, filename):
-        """Remove hash from filename."""
-        # Pattern matches: name + space + 32 char hash + extension
-        pattern = r'^(.+?)\s+[a-f0-9]{32}(\..+)$'
-        match = re.match(pattern, filename)
-        if match:
-            return f"{match.group(1)}{match.group(2)}"
-        return filename
+def remove_md5_from_name(name):
+    """
+    Remove MD5 hash from a filename or directory name.
+    Assumes the hash is separated by '%20', space, hyphen, or underscore from the main name.
+    """
+    # Regex to match ' %20<32 hex chars>', ' <32 hex chars>', '-<32 hex chars>', '_<32 hex chars>' at the end
+    pattern = re.compile(r"^(.*?)(?:%20|\s|[-_])[a-fA-F0-9]{32}(\.[^.]+)?$")
+    match = pattern.match(name)
+    if match:
+        base = match.group(1)
+        extension = match.group(2) if match.group(2) else ''
+        new_name = base + extension
+        return new_name
+    return name
 
-    def encode_path(self, path):
-        """Encode spaces in path with %20."""
-        parts = path.split('/')
-        encoded_parts = [part.replace(' ', '%20') for part in parts]
-        return '/'.join(encoded_parts)
+def clean_file_content(file_path, dry_run=False, backup=False):
+    """
+    Remove all MD5 hashes from the file content, especially within Markdown links.
+    Preserves newlines and overall formatting.
+    """
+    # Define the file extensions to process
+    TEXT_FILE_EXTENSIONS = {'.md', '.markdown', '.txt', '.html', '.htm', '.json', '.csv', '.xml'}
 
-    def clean_content(self, content):
-        """Clean markdown links."""
-        # Find all markdown links
-        pattern = r'\[([^\]]+)\]\(([^)]+)\)'
-        
-        def replace_link(match):
-            link_text = match.group(1)
-            link_path = match.group(2)
-            
-            # Remove ** from link text and path
-            clean_text = link_text.replace('**', '')
-            
-            # Fix duplicate parts and cleanup path
-            clean_path = clean_text
-            
-            # Handle special cases where the title is repeated in the path
-            if "Injection Cheat Sheet" in clean_path:
-                clean_path = clean_path.replace(" Injection Cheat Sheet Injection Cheat Sheet", " Injection Cheat Sheet")
-            if "Cheat Sheet Cheat Sheet" in clean_path:
-                clean_path = clean_path.replace(" Cheat Sheet Cheat Sheet", " Cheat Sheet")
-                
-            # Remove hash patterns
-            clean_path = re.sub(r'%20[0-9a-f]{32}\.md\)$', '', clean_path)
-            clean_path = re.sub(r'\.md\)\.md\)$', '', clean_path)
-            
-            # Encode spaces properly
-            clean_path = clean_path.replace(' ', '%20')
-            
-            return f'[{link_text}](Cheat%20Sheets/{clean_path}.md)'
-        
-        # Clean up the links
-        cleaned = re.sub(pattern, replace_link, content)
-        
-        # Also clean any leftover ** in the headers
-        cleaned = cleaned.replace('**', '')
-        
-        # Remove any duplicate .md extensions
-        cleaned = re.sub(r'\.md\.md\)', '.md)', cleaned)
-        
-        return cleaned
+    # Skip files that are likely binary or not of interest
+    if Path(file_path).suffix.lower() not in TEXT_FILE_EXTENSIONS:
+        return
 
-    def clean_directory_name(self, dirname):
-        """Remove hash from directory name."""
-        pattern = r'^(.+?)\s+[a-f0-9]{32}$'
-        match = re.match(pattern, dirname)
-        if match:
-            return match.group(1)
-        return dirname
-
-    def process_file(self, filepath):
-        """Process markdown file content."""
-        if not filepath.lower().endswith('.md'):
-            return
-
+    try:
+        with open(file_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+    except UnicodeDecodeError:
+        # Try reading with a different encoding
         try:
-            with open(filepath, 'r', encoding='utf-8') as f:
+            with open(file_path, 'r', encoding='latin-1') as f:
                 content = f.read()
-            
-            new_content = self.clean_content(content)
-            
-            if new_content != content and not self.dry_run:
-                with open(filepath, 'w', encoding='utf-8') as f:
-                    f.write(new_content)
-                print(f"Updated content in: {filepath}")
-            elif new_content != content:
-                print(f"Would update content in: {filepath}")
-                
         except Exception as e:
-            print(f"Error processing file {filepath}: {e}")
+            print(f"Skipping binary or unreadable file: {file_path} ({e})")
+            return
+    except PermissionError as e:
+        print(f"Permission denied for file: {file_path} ({e})")
+        return
 
-    def rename_file(self, old_path):
-        """Rename file to remove hash."""
-        directory = os.path.dirname(old_path)
-        filename = os.path.basename(old_path)
-        new_filename = self.clean_filename(filename)
-        
-        if new_filename != filename:
-            new_path = os.path.join(directory, new_filename)
-            if self.dry_run:
-                print(f"Would rename: {old_path} -> {new_path}")
-                return old_path
-                
+    original_content = content  # Keep for comparison
+
+    # Pattern to remove MD5 hashes preceded by '%20', space, hyphen, or underscore
+    # Ensures that the hash is followed by a slash '/' or a file extension like '.md'
+    hash_pattern = re.compile(r'(%20|\s|[-_])[a-fA-F0-9]{32}(?=\/|\.md)')
+
+    def replace_hash(match):
+        sep = match.group(1)
+        if sep == '%20':
+            # Remove the '%20' and the hash by replacing with nothing
+            return ''
+        else:
+            # Replace ' <hash>' with ' ', '-<hash>' with '-', '_<hash>' with '_'
+            return sep
+
+    # Apply the substitution using the replacement function
+    new_content, num_subs = hash_pattern.subn(replace_hash, content)
+
+    # No additional cleanup steps to avoid altering newlines and formatting
+
+    if num_subs > 0:
+        if backup and not dry_run:
+            backup_path = f"{file_path}.bak"
             try:
-                os.rename(old_path, new_path)
-                print(f"Renamed: {old_path} -> {new_path}")
-                return new_path
+                shutil.copy2(file_path, backup_path)
+                print(f"Backup created: {backup_path}")
             except Exception as e:
-                print(f"Error renaming {old_path}: {e}")
-                return old_path
-        return old_path
+                print(f"Error creating backup for '{file_path}': {e}")
+                return
 
-    def rename_directory(self, old_path):
-        """Rename directory to remove hash."""
-        parent_dir = os.path.dirname(old_path)
-        dirname = os.path.basename(old_path)
-        new_dirname = self.clean_directory_name(dirname)
-        
-        if new_dirname != dirname:
-            new_path = os.path.join(parent_dir, new_dirname)
-            if self.dry_run:
-                print(f"Would rename directory: {old_path} -> {new_path}")
-                return old_path
-                
+        if not dry_run:
             try:
-                os.rename(old_path, new_path)
-                print(f"Renamed directory: {old_path} -> {new_path}")
-                return new_path
+                with open(file_path, 'w', encoding='utf-8') as f:
+                    f.write(new_content)
+                print(f"Cleaned {num_subs} hashes in file: {file_path}")
             except Exception as e:
-                print(f"Error renaming directory {old_path}: {e}")
-                return old_path
-        return old_path
+                print(f"Error writing to file '{file_path}': {e}")
+        else:
+            print(f"[Dry Run] Would clean {num_subs} hashes in file: {file_path}")
 
-    def process_directory(self):
-        """Process all files and directories recursively."""
-        print(f"\nProcessing directory: {self.directory}")
-        print("Dry run mode:", "Yes" if self.dry_run else "No")
-        
-        # First, clean directory names (bottom-up to handle nested directories)
-        for root, dirs, _ in os.walk(self.directory, topdown=False):
-            for dirname in dirs:
-                old_dir_path = os.path.join(root, dirname)
-                self.rename_directory(old_dir_path)
+def rename_entities(root_dir, dry_run=False):
+    """
+    Recursively rename directories and files by removing MD5 hashes.
+    """
+    # Walk the directory tree from bottom up to handle nested directories
+    for dirpath, dirnames, filenames in os.walk(root_dir, topdown=False):
+        # Rename files
+        for filename in filenames:
+            new_filename = remove_md5_from_name(filename)
+            if new_filename != filename:
+                src = os.path.join(dirpath, filename)
+                dst = os.path.join(dirpath, new_filename)
+                if dry_run:
+                    print(f"[Dry Run] Would rename file: '{src}' -> '{dst}'")
+                else:
+                    try:
+                        os.rename(src, dst)
+                        print(f"Renamed file: '{src}' -> '{dst}'")
+                    except Exception as e:
+                        print(f"Error renaming file '{src}': {e}")
 
-        # Then process files
-        for root, _, files in os.walk(self.directory):
-            for filename in files:
-                if filename.endswith('.md'):
-                    filepath = os.path.join(root, filename)
-                    # First process content
-                    self.process_file(filepath)
-                    # Then rename file
-                    self.rename_file(filepath)
+        # Rename directories
+        for dirname in dirnames:
+            new_dirname = remove_md5_from_name(dirname)
+            if new_dirname != dirname:
+                src = os.path.join(dirpath, dirname)
+                dst = os.path.join(dirpath, new_dirname)
+                if dry_run:
+                    print(f"[Dry Run] Would rename directory: '{src}' -> '{dst}'")
+                else:
+                    try:
+                        os.rename(src, dst)
+                        print(f"Renamed directory: '{src}' -> '{dst}'")
+                    except Exception as e:
+                        print(f"Error renaming directory '{src}': {e}")
+
+def clean_contents(root_dir, dry_run=False, backup=False):
+    """
+    Recursively clean file contents by removing MD5 hashes.
+    """
+    for dirpath, dirnames, filenames in os.walk(root_dir):
+        for filename in filenames:
+            file_path = os.path.join(dirpath, filename)
+            clean_file_content(file_path, dry_run=dry_run, backup=backup)
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="Clean up Notion markdown exports by removing hashes and fixing links."
-    )
-    parser.add_argument(
-        "directory",
-        help="Directory containing the Notion export files"
-    )
-    parser.add_argument(
-        "--dry-run",
-        action="store_true",
-        help="Show what would be done without making changes"
-    )
-    
+    parser = argparse.ArgumentParser(description="Clean Notion Export MD5 Hashes from Filenames, Directory Names, and File Contents")
+    parser.add_argument("root_dir", help="Path to the exported Notion directory")
+    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without making changes")
+    parser.add_argument("--backup", action="store_true", help="Create backups of files before modifying them")
     args = parser.parse_args()
-    
-    if not os.path.isdir(args.directory):
-        print(f"Error: {args.directory} is not a directory")
-        return 1
-        
-    cleaner = NotionCleaner(args.directory, args.dry_run)
-    cleaner.process_directory()
-    
-    print("\nProcessing complete!")
-    return 0
+
+    root_dir = args.root_dir
+    dry_run = args.dry_run
+    backup = args.backup
+
+    if not os.path.isdir(root_dir):
+        print(f"Error: '{root_dir}' is not a valid directory.")
+        sys.exit(1)
+
+    print("Starting renaming of files and directories...")
+    rename_entities(root_dir, dry_run=dry_run)
+
+    print("\nStarting cleaning of file contents...")
+    clean_contents(root_dir, dry_run=dry_run, backup=backup)
+
+    if not dry_run:
+        print("\nMD5 hash removal completed successfully.")
+    else:
+        print("\nDry run completed. No changes were made.")
 
 if __name__ == "__main__":
-    exit(main())
+    main()
