@@ -1,6 +1,3 @@
-Here's a README.md for the Notion file cleaner script:
-
-```markdown
 # Notion Export File Cleaner
 
 A Python script to clean up Notion exported files by removing hashes, fixing file names, and correcting markdown links.
@@ -104,6 +101,3 @@ Feel free to submit issues, fork the repository, and create pull requests for an
 ## License
 
 MIT License - feel free to use and modify for your own purposes.
-```
-
-This README provides a comprehensive overview of the script's functionality, usage instructions, and examples. Would you like me to add or modify any sections?
