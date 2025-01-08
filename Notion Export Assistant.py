@@ -8,6 +8,8 @@ import sys
 import argparse
 import shutil
 from pathlib import Path
+import tkinter as tk
+from tkinter import filedialog, messagebox
 
 def remove_md5_from_name(name):
     """
@@ -136,28 +138,62 @@ def clean_contents(root_dir, dry_run=False, backup=False):
             file_path = os.path.join(dirpath, filename)
             clean_file_content(file_path, dry_run=dry_run, backup=backup)
 
+def select_folder_via_dialog():
+    """
+    Opens a GUI dialog for folder selection and returns the selected path.
+    """
+    root = tk.Tk()
+    root.withdraw()  # Hide the main window
+    root.update()  # Prevents the window from appearing briefly
+    folder_selected = filedialog.askdirectory(title="Select Root Directory")
+    root.destroy()
+    return folder_selected
+
 def main():
-    parser = argparse.ArgumentParser(description="Clean Notion Export MD5 Hashes from Filenames, Directory Names, and File Contents")
-    parser.add_argument("root_dir", help="Path to the exported Notion directory")
-    parser.add_argument("--dry-run", action="store_true", help="Perform a dry run without making changes")
-    parser.add_argument("--backup", action="store_true", help="Create backups of files before modifying them")
+    parser = argparse.ArgumentParser(
+        description="Clean Notion Export MD5 Hashes from Filenames, Directory Names, and File Contents"
+    )
+    parser.add_argument(
+        "root_dir",
+        nargs='?',
+        help="Path to the exported Notion directory. If not provided, a folder selection dialog will appear."
+    )
+    parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="Perform a dry run without making changes"
+    )
+    parser.add_argument(
+        "--backup",
+        action="store_true",
+        help="Create backups of files before modifying them"
+    )
     args = parser.parse_args()
 
-    root_dir = args.root_dir
-    dry_run = args.dry_run
-    backup = args.backup
+    # Determine the root directory
+    if args.root_dir:
+        root_dir = args.root_dir
+    else:
+        root_dir = select_folder_via_dialog()
+        if not root_dir:
+            print("No directory selected. Exiting.")
+            sys.exit(1)
 
     if not os.path.isdir(root_dir):
         print(f"Error: '{root_dir}' is not a valid directory.")
         sys.exit(1)
 
+    print(f"Selected directory: {root_dir}")
+    print(f"Dry Run: {'Enabled' if args.dry_run else 'Disabled'}")
+    print(f"Backup: {'Enabled' if args.backup else 'Disabled'}\n")
+
     print("Starting renaming of files and directories...")
-    rename_entities(root_dir, dry_run=dry_run)
+    rename_entities(root_dir, dry_run=args.dry_run)
 
     print("\nStarting cleaning of file contents...")
-    clean_contents(root_dir, dry_run=dry_run, backup=backup)
+    clean_contents(root_dir, dry_run=args.dry_run, backup=args.backup)
 
-    if not dry_run:
+    if not args.dry_run:
         print("\nMD5 hash removal completed successfully.")
     else:
         print("\nDry run completed. No changes were made.")
